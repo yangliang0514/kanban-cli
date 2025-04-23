@@ -4,7 +4,7 @@ type Status int
 
 const (
 	todo Status = iota
-	inprogress
+	inProgress
 	done
 )
 

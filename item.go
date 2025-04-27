@@ -31,6 +31,14 @@ type ListOption struct {
 	title string
 }
 
+func (l ListOption) Title() string {
+	return l.title
+}
+
+func (l ListOption) Description() string {
+	return ""
+}
+
 func (l ListOption) FilterValue() string {
 	return l.title
 }

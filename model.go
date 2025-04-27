@@ -32,7 +32,6 @@ type Model struct {
 
 type MoveToModel struct {
 	optionList  list.Model
-	fromList    Status
 	toList      Status
 	initialized bool
 }
@@ -72,7 +71,7 @@ func (m Model) View() string {
 	case listsView:
 		return m.renderListsView()
 	case moveToView:
-		return m.renderMoveToModal()
+		return m.renderMoveToView()
 	}
 
 	return ""
@@ -119,11 +118,11 @@ func (m *Model) handleKeyStroke(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.lists[m.focusList], cmd = m.lists[m.focusList].Update(msg)
 		return m, cmd
 	case moveToView:
-		m.handleKeyMoveToView(msg.String())
+		cmd1 := m.handleKeyMoveToView(msg.String())
 
-		var cmd tea.Cmd
-		m.moveToModel.optionList, cmd = m.moveToModel.optionList.Update(msg)
-		return m, cmd
+		var cmd2 tea.Cmd
+		m.moveToModel.optionList, cmd2 = m.moveToModel.optionList.Update(msg)
+		return m, tea.Batch(cmd1, cmd2)
 	}
 
 	return m, nil
@@ -150,15 +149,38 @@ func (m *Model) handleKeyListView(msgStr string) {
 			m.initMoveToModel()
 		}
 
-		m.moveToModel.fromList = m.focusList
 	}
 }
 
-func (m *Model) handleKeyMoveToView(msgStr string) {
+func (m *Model) handleKeyMoveToView(msgStr string) tea.Cmd {
 	switch msgStr {
 	case "b":
 		m.currentView = listsView
+	case tea.KeyEnter.String():
+		selectedOption := m.moveToModel.optionList.SelectedItem().(ListOption)
+
+		m.currentView = listsView
+
+		return m.moveTask(int(selectedOption.list))
 	}
+
+	return nil
+}
+
+func (m *Model) moveTask(toList int) tea.Cmd {
+	if int(m.focusList) == toList {
+		return nil
+	}
+
+	currentList := m.lists[m.focusList]
+	newTargetListItems := append(m.lists[toList].Items(), currentList.SelectedItem())
+
+	m.lists[m.focusList].RemoveItem(currentList.Index())
+	cmd := m.lists[toList].SetItems(newTargetListItems)
+	m.focusList = Status(toList)
+	m.lists[m.focusList].Select(len(newTargetListItems) - 1)
+
+	return cmd
 }
 
 func (m Model) renderListWithStyle(list Status) string {
@@ -179,27 +201,12 @@ func (m Model) renderListsView() string {
 	)
 }
 
-func (m *Model) renderMoveToModal() string {
-	options := []list.Item{
-		ListOption{list: todo, title: "Todo"},
-		ListOption{list: inProgress, title: "In Progress"},
-		ListOption{list: done, title: "Done"},
-	}
+func (m *Model) renderMoveToView() string {
+	selectedItem := m.lists[m.focusList].SelectedItem().(Task)
 
-	list := list.New(options, list.NewDefaultDelegate(), m.width/2, m.height/2)
-	m.moveToModel = MoveToModel{fromList: m.focusList}
+	m.moveToModel.optionList.Title = fmt.Sprintf("Move task [ %s ] to...", selectedItem.Title())
 
-	list.SetShowHelp(false)
-	selectedItem, ok := m.lists[m.focusList].SelectedItem().(Task)
-
-	if !ok {
-		m.quitting = true
-		return ""
-	}
-
-	list.Title = fmt.Sprintf("Move task [ %s ] to...", selectedItem.Title())
-
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, modalStyle.Render(list.View()))
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, modalStyle.Render(m.moveToModel.optionList.View()))
 }
 
 // temporary mock data
@@ -213,16 +220,16 @@ func todoMockData() []list.Item {
 
 func inProgressMockData() []list.Item {
 	return []list.Item{
-		&Task{title: "Fix login bug", description: "Investigating session timeout issue"},
-		&Task{title: "Refactor profile page", description: "Split into smaller components"},
-		&Task{title: "Write tests", description: "Add coverage for user service"},
-		&Task{title: "Deploy v1.0", description: "Released first version to production"},
+		Task{title: "Fix login bug", description: "Investigating session timeout issue"},
+		Task{title: "Refactor profile page", description: "Split into smaller components"},
+		Task{title: "Write tests", description: "Add coverage for user service"},
+		Task{title: "Deploy v1.0", description: "Released first version to production"},
 	}
 }
 
 func doneMockData() []list.Item {
 	return []list.Item{
-		&Task{title: "Set up CI", description: "Configured GitHub Actions for builds"},
-		&Task{title: "Onboard new dev", description: "Walked them through codebase"},
+		Task{title: "Set up CI", description: "Configured GitHub Actions for builds"},
+		Task{title: "Onboard new dev", description: "Walked them through codebase"},
 	}
 }

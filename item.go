@@ -10,7 +10,6 @@ const (
 
 // this struct implements list.Item interface
 type Task struct {
-	status      Status
 	title       string
 	description string
 }
@@ -25,4 +24,13 @@ func (t Task) Description() string {
 
 func (t Task) FilterValue() string {
 	return t.title
+}
+
+type ListOption struct {
+	list  Status
+	title string
+}
+
+func (l ListOption) FilterValue() string {
+	return l.title
 }

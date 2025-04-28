@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
@@ -142,6 +143,11 @@ func (m *Model) handleKeyListView(msgStr string) {
 		} else {
 			m.focusList--
 		}
+	case "d":
+		currentList := &m.lists[m.focusList]
+		items := currentList.Items()
+		items = slices.Delete(items, currentList.Index(), currentList.Index()+1)
+		currentList.SetItems(items)
 	case tea.KeyEnter.String():
 		m.currentView = moveToView
 

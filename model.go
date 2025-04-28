@@ -29,12 +29,19 @@ type Model struct {
 	height      int
 	quitting    bool
 	moveToModel MoveToModel
+	undoStack   []UndoItem
 }
 
 type MoveToModel struct {
 	optionList  list.Model
 	toList      Status
 	initialized bool
+}
+
+type UndoItem struct {
+	list  Status
+	item  list.Item
+	index int
 }
 
 func New() *Model {
@@ -145,9 +152,30 @@ func (m *Model) handleKeyListView(msgStr string) {
 		}
 	case "d":
 		currentList := &m.lists[m.focusList]
+		currentItem := currentList.SelectedItem()
+		currentIndex := currentList.Index()
+
+		if currentItem == nil {
+			return
+		}
+
 		items := currentList.Items()
-		items = slices.Delete(items, currentList.Index(), currentList.Index()+1)
+		items = slices.Delete(items, currentIndex, currentIndex+1)
 		currentList.SetItems(items)
+		m.pushToUndoStack(m.focusList, currentItem, currentIndex)
+	case "u":
+		targetList, item, targetIndex := m.popFromUndoStack()
+
+		if item == nil {
+			return
+		}
+
+		undoItemList := &m.lists[targetList]
+		items := undoItemList.Items()
+		items = slices.Insert(items, targetIndex, item)
+		undoItemList.SetItems(items)
+		undoItemList.Select(targetIndex)
+		m.focusList = targetList
 	case tea.KeyEnter.String():
 		m.currentView = moveToView
 
@@ -213,6 +241,21 @@ func (m *Model) renderMoveToView() string {
 	m.moveToModel.optionList.Title = fmt.Sprintf("Move task [ %s ] to...", selectedItem.Title())
 
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, modalStyle.Render(m.moveToModel.optionList.View()))
+}
+
+func (m *Model) pushToUndoStack(list Status, item list.Item, index int) {
+	m.undoStack = append(m.undoStack, UndoItem{list: list, item: item, index: index})
+}
+
+func (m *Model) popFromUndoStack() (Status, list.Item, int) {
+	if len(m.undoStack) == 0 {
+		return 0, nil, 0
+	}
+
+	lastItem := m.undoStack[len(m.undoStack)-1]
+	m.undoStack = m.undoStack[:len(m.undoStack)-1]
+
+	return lastItem.list, lastItem.item, lastItem.index
 }
 
 // temporary mock data
